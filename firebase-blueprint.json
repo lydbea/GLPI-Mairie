@@ -1,0 +1,52 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "Utilisateur de l'application avec un rôle spécifique.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "ID unique de l'utilisateur Firebase Auth" },
+        "email": { "type": "string", "format": "email" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["agent", "technicien", "responsable"] }
+      },
+      "required": ["uid", "email", "name", "role"]
+    },
+    "Asset": {
+      "title": "Asset",
+      "description": "Un actif municipal (véhicule, parc informatique, bâtiment).",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": ["véhicule", "informatique", "bâtiment"] },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "type"]
+    },
+    "Ticket": {
+      "title": "Ticket",
+      "description": "Un ticket d'incident ou d'activité.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "status": { "type": "string", "enum": ["Nouveau", "Assigné", "En cours", "En attente de pièces", "Résolu", "Clos"] },
+        "priority": { "type": "string", "enum": ["Urgent", "Normal", "Bas"] },
+        "category": { "type": "string", "enum": ["Voirie", "Éclairage public", "Bâtiments communaux", "Espaces verts", "Informatique"] },
+        "assetId": { "type": "string" },
+        "authorId": { "type": "string" },
+        "technicianId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "title", "status", "priority", "category", "authorId", "createdAt"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "User", "description": "Profils utilisateurs" },
+    "/assets/{assetId}": { "schema": "Asset", "description": "Inventaire des actifs" },
+    "/tickets/{ticketId}": { "schema": "Ticket", "description": "Tickets d'incidents" }
+  }
+}

@@ -1,0 +1,112 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Assumed Data Model
+    // ===============================================================
+    // Collection: users
+    // Document ID: uid
+    // Fields:
+    //   - uid: string (required)
+    //   - email: string (required, email format)
+    //   - name: string (required)
+    //   - role: string (required, enum: ['agent', 'technicien', 'responsable'])
+    //
+    // Collection: assets
+    // Document ID: assetId
+    // Fields:
+    //   - id: string (required)
+    //   - name: string (required)
+    //   - type: string (required, enum: ['véhicule', 'informatique', 'bâtiment'])
+    //   - description: string (optional)
+    //
+    // Collection: tickets
+    // Document ID: ticketId
+    // Fields:
+    //   - id: string (required)
+    //   - title: string (required)
+    //   - description: string (optional)
+    //   - status: string (required, enum: ['Nouveau', 'Assigné', 'En cours', 'En attente de pièces', 'Résolu', 'Clos'])
+    //   - priority: string (required, enum: ['Urgent', 'Normal', 'Bas'])
+    //   - category: string (required, enum: ['Voirie', 'Éclairage public', 'Bâtiments communaux', 'Espaces verts', 'Informatique'])
+    //   - assetId: string (optional)
+    //   - authorId: string (required)
+    //   - technicianId: string (optional)
+    //   - createdAt: timestamp (required)
+    //   - updatedAt: timestamp (optional)
+    // ===============================================================
+
+    // Helper Functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function getUserRole() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) 
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role 
+        : null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        getUserRole() == 'responsable' ||
+        request.auth.token.email.lower() == "noeballet.nb@gmail.com"
+      );
+    }
+
+    function isTechnician() {
+      return isAuthenticated() && getUserRole() == 'technicien';
+    }
+
+    function isAgent() {
+      return isAuthenticated() && getUserRole() == 'agent';
+    }
+
+    // Validation Functions
+    function isValidUser(data) {
+      return data.keys().hasAll(['uid', 'email', 'name', 'role']) &&
+             data.uid is string &&
+             data.email is string &&
+             data.name is string &&
+             data.role in ['agent', 'technicien', 'responsable'];
+    }
+
+    function isValidTicket(data) {
+      return data.keys().hasAll(['id', 'title', 'status', 'priority', 'category', 'authorId', 'createdAt']) &&
+             data.id is string &&
+             data.title is string &&
+             data.status in ['Nouveau', 'Assigné', 'En cours', 'En attente de pièces', 'Résolu', 'Clos'] &&
+             data.priority in ['Urgent', 'Normal', 'Bas'] &&
+             data.category in ['Voirie', 'Éclairage public', 'Bâtiments communaux', 'Espaces verts', 'Informatique'] &&
+             data.authorId is string &&
+             data.createdAt is timestamp;
+    }
+
+    // Rules
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidUser(request.resource.data) && ((isOwner(userId) && request.resource.data.role == 'agent') || isAdmin());
+      allow update: if isAdmin() || (isOwner(userId) && request.resource.data.role == resource.data.role);
+    }
+
+    match /assets/{assetId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /tickets/{ticketId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidTicket(request.resource.data) && request.resource.data.authorId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        isAdmin() || 
+        (isTechnician() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'updatedAt', 'technicianId'])) ||
+        (isOwner(resource.data.authorId) && resource.data.status == 'Nouveau')
+      );
+      allow delete: if isAdmin();
+    }
+  }
+}

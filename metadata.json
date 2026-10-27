@@ -1,0 +1,5 @@
+{
+  "name": "MuniTrack - Gestion d'Incidents Municipaux",
+  "description": "Une application de type GLPI pour la traçabilité et le suivi des incidents et activités de la municipalité.",
+  "requestFramePermissions": []
+}
